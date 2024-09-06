@@ -16,15 +16,13 @@ mod utils;
 
 pub fn main() -> eframe::Result {
     let center = CosmosObject {
-        mass: 50.0,
-        radius: 10.0,
+        mass: 100.0,
         position: Pos2::default(),
         velocity: Vec2::ZERO,
     };
 
     let planet = CosmosObject {
-        mass: 1.0,
-        radius: 4.0,
+        mass: 5.0,
         ..Default::default()
     }
     .orbit(&center, 30.0, 0.0, 1.0);
