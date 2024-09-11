@@ -12,6 +12,7 @@ pub struct App {
     moving: Option<Moving>,
     adding: Option<Adding>,
     transform: TSTransform,
+    adding_mass: f32
 }
 
 impl eframe::App for App {
@@ -49,18 +50,27 @@ impl eframe::App for App {
                     return;
                 };
 
-                if let Some(Adding { origin, mass }) = self.adding {
+                if let Some(Adding { origin }) = self.adding {
                     let position = self.transform.inverse() * origin;
                     let velocity = (origin - mouse_pos) / self.transform.scaling;
 
                     CosmosObject {
-                        mass,
+                        mass: self.adding_mass,
                         position,
                         velocity,
                     }
                     .draw(painter);
 
                     painter.vec(position, velocity, Stroke::new(1., Color32::LIGHT_RED));
+
+                    ctx.input(|state| 
+                        for event in state.events.iter() {
+    
+                            if let egui::Event::MouseWheel { delta, .. } = event {
+                                self.adding_mass *= 1.7f32.powf(delta.y);
+                            } 
+                        }
+                    );
                 }
             });
     }
@@ -73,6 +83,7 @@ impl App {
             transform,
             moving: None,
             adding: None,
+            adding_mass: 20.0
         }
     }
 
@@ -137,7 +148,6 @@ impl App {
         if pressed {
             self.adding = Some(Adding {
                 origin: mouse_pos,
-                mass: 20.0,
             })
         } else if released {
             let adding = self.adding.take().unwrap();
@@ -148,10 +158,12 @@ impl App {
             let velocity = (adding.origin - mouse_pos) / self.transform.scaling;
 
             objects.push(RwLock::new(CosmosObject {
-                mass: 20.0,
+                mass: self.adding_mass,
                 position,
                 velocity,
             }));
+
+            
         }
     }
 }
@@ -165,5 +177,4 @@ pub struct Moving {
 #[derive(Clone, Copy)]
 pub struct Adding {
     pub origin: Pos2,
-    pub mass: f32,
 }
