@@ -12,7 +12,7 @@ pub struct App {
     moving: Option<Moving>,
     adding: Option<Adding>,
     transform: TSTransform,
-    adding_mass: f32
+    adding_mass: f32,
 }
 
 impl eframe::App for App {
@@ -63,14 +63,13 @@ impl eframe::App for App {
 
                     painter.vec(position, velocity, Stroke::new(1., Color32::LIGHT_RED));
 
-                    ctx.input(|state| 
+                    ctx.input(|state| {
                         for event in state.events.iter() {
-    
                             if let egui::Event::MouseWheel { delta, .. } = event {
                                 self.adding_mass *= 1.7f32.powf(delta.y);
-                            } 
+                            }
                         }
-                    );
+                    });
                 }
             });
     }
@@ -83,7 +82,7 @@ impl App {
             transform,
             moving: None,
             adding: None,
-            adding_mass: 20.0
+            adding_mass: 20.0,
         }
     }
 
@@ -146,9 +145,7 @@ impl App {
         };
 
         if pressed {
-            self.adding = Some(Adding {
-                origin: mouse_pos,
-            })
+            self.adding = Some(Adding { origin: mouse_pos })
         } else if released {
             let adding = self.adding.take().unwrap();
 
@@ -162,8 +159,6 @@ impl App {
                 position,
                 velocity,
             }));
-
-            
         }
     }
 }
