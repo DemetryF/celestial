@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
-use egui::{emath::TSTransform, Color32, Frame, Margin, Pos2, Sense};
-use egui::{Stroke, Vec2};
+use egui::emath::TSTransform;
+use egui::{Color32, Frame, Key, Margin, Pos2, Sense, Vec2};
 
 use crate::cosmos_object::CosmosObject;
 use crate::utils::Painter;
@@ -13,6 +13,8 @@ pub struct App {
     adding: Option<Adding>,
     transform: TSTransform,
     adding_mass: f32,
+    showed_quantity: Option<PhysicalQuantity>,
+    quantity_scale: [f32; 4],
 }
 
 impl eframe::App for App {
@@ -22,6 +24,34 @@ impl eframe::App for App {
         self.update_moving(ctx);
         self.update_adding(ctx);
         self.update_zoom(ctx);
+
+        self.showed_quantity = ctx.input(|state| {
+            if state.key_pressed(Key::Escape) {
+                return None;
+            }
+
+            let pressed = if state.key_pressed(Key::V) {
+                Some(PhysicalQuantity::Velocity)
+            } else if state.key_pressed(Key::I) {
+                Some(PhysicalQuantity::Impulse)
+            } else if state.key_pressed(Key::A) {
+                Some(PhysicalQuantity::Acceleration)
+            } else if state.key_pressed(Key::F) {
+                Some(PhysicalQuantity::Force)
+            } else {
+                None
+            };
+
+            if let Some(pressed) = pressed {
+                if Some(pressed) == self.showed_quantity {
+                    None
+                } else {
+                    Some(pressed)
+                }
+            } else {
+                self.showed_quantity
+            }
+        });
 
         egui::CentralPanel::default()
             .frame(Frame {
@@ -43,7 +73,17 @@ impl eframe::App for App {
                 for object in objects.iter() {
                     let object = &object.read().unwrap();
 
-                    object.draw(painter)
+                    object.draw(painter);
+
+                    if let Some(quantity) = self.showed_quantity {
+                        let scale = self.quantity_scale[quantity as usize];
+
+                        painter.vec(
+                            object.position,
+                            object.get_quantity(quantity) * scale,
+                            quantity.color(),
+                        );
+                    }
                 }
 
                 let Some(mouse_pos) = ctx.input(|state| state.pointer.hover_pos()) else {
@@ -58,10 +98,13 @@ impl eframe::App for App {
                         mass: self.adding_mass,
                         position,
                         velocity,
+                        ..Default::default()
                     }
                     .draw(painter);
 
-                    painter.vec(position, velocity, Stroke::new(1., Color32::LIGHT_RED));
+                    let scale = self.quantity_scale[PhysicalQuantity::Velocity as usize];
+
+                    painter.vec(position, velocity * scale, Color32::LIGHT_RED);
 
                     ctx.input(|state| {
                         for event in state.events.iter() {
@@ -83,22 +126,45 @@ impl App {
             moving: None,
             adding: None,
             adding_mass: 20.0,
+            showed_quantity: None,
+            quantity_scale: [1.0, 1.0, 1.0, 1.0],
         }
     }
 
     fn update_zoom(&mut self, ctx: &egui::Context) {
-        if let Some(real_mouse_pos) = ctx.input(|state| state.pointer.hover_pos()) {
-            let delta_scale = ctx.input(|state| state.zoom_delta());
+        if self.adding.is_some() {
+            return;
+        }
 
-            if delta_scale != 1.0 {
-                let new_real_mouse_pos =
-                    (real_mouse_pos - self.transform.translation) / delta_scale;
+        ctx.input(|state| {
+            for event in state.events.iter() {
+                let egui::Event::MouseWheel { delta, .. } = event else {
+                    continue;
+                };
 
-                let delta = new_real_mouse_pos - real_mouse_pos + self.transform.translation;
+                let zoom_delta = 1.7f32.powf(delta.y);
 
-                self.transform.translation += delta;
-                self.transform.scaling *= delta_scale;
+                if state.modifiers.shift {
+                    if let Some(quantity) = self.showed_quantity {
+                        self.quantity_scale[quantity as usize] *= zoom_delta;
+                    }
+                } else {
+                    if let Some(real_mouse_pos) = state.pointer.hover_pos() {
+                        self.zoom_relative_to(zoom_delta, real_mouse_pos);
+                    }
+                }
             }
+        });
+    }
+
+    fn zoom_relative_to(&mut self, delta_scale: f32, point: Pos2) {
+        if delta_scale != 1.0 {
+            let new_real_mouse_pos = (point - self.transform.translation) / delta_scale;
+
+            let delta = new_real_mouse_pos - point + self.transform.translation;
+
+            self.transform.translation += delta;
+            self.transform.scaling *= delta_scale;
         }
     }
 
@@ -158,6 +224,7 @@ impl App {
                 mass: self.adding_mass,
                 position,
                 velocity,
+                ..Default::default()
             }));
         }
     }
@@ -172,4 +239,23 @@ pub struct Moving {
 #[derive(Clone, Copy)]
 pub struct Adding {
     pub origin: Pos2,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PhysicalQuantity {
+    Velocity = 0,
+    Impulse = 1,
+    Acceleration = 2,
+    Force = 3,
+}
+
+impl PhysicalQuantity {
+    pub fn color(self) -> Color32 {
+        match self {
+            PhysicalQuantity::Velocity => Color32::LIGHT_RED,
+            PhysicalQuantity::Impulse => Color32::LIGHT_BLUE,
+            PhysicalQuantity::Acceleration => Color32::LIGHT_GREEN,
+            PhysicalQuantity::Force => Color32::LIGHT_YELLOW,
+        }
+    }
 }

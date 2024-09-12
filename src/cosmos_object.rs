@@ -1,6 +1,6 @@
 use egui::{Color32, Pos2, Stroke, Vec2};
 
-use crate::utils::Painter;
+use crate::{app::PhysicalQuantity, utils::Painter};
 
 #[derive(Default)]
 pub struct CosmosObject {
@@ -8,6 +8,7 @@ pub struct CosmosObject {
 
     pub position: Pos2,
     pub velocity: Vec2,
+    pub acceleration: Vec2,
 }
 
 impl CosmosObject {
@@ -28,5 +29,14 @@ impl CosmosObject {
 
     pub fn radius(&self) -> f32 {
         self.mass.sqrt()
+    }
+
+    pub fn get_quantity(&self, quantity: PhysicalQuantity) -> Vec2 {
+        match quantity {
+            PhysicalQuantity::Velocity => self.velocity,
+            PhysicalQuantity::Impulse => self.velocity * self.mass,
+            PhysicalQuantity::Acceleration => self.acceleration,
+            PhysicalQuantity::Force => self.acceleration * self.mass,
+        }
     }
 }
