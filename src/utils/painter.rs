@@ -27,7 +27,7 @@ impl<'frame> Painter<'frame> {
         self.draw(CircleShape {
             center,
             radius,
-            fill: fill_color.into(),
+            fill: fill_color,
             stroke: stroke.into(),
         });
     }
@@ -39,14 +39,12 @@ impl<'frame> Painter<'frame> {
         })
     }
 
-    pub fn vec(&self, origin: Pos2, vec: Vec2, stroke: impl Into<Stroke>) {
-        let mut stroke = stroke.into();
+    pub fn vec(&self, origin: Pos2, vec: Vec2, color: Color32) {
+        let stroke = Stroke::new(0.5, color);
 
         let rot = Rot2::from_angle(std::f32::consts::TAU / 10.);
 
-        stroke.width *= vec.length().sqrt() / 6.0;
-
-        let tip_length = vec.length().sqrt() / 4.0;
+        let tip_length = 0.3;
         let tip = origin + vec;
         let dir = vec.normalized();
 

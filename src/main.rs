@@ -3,7 +3,7 @@ use std::thread;
 
 use eframe::NativeOptions;
 use egui::emath::TSTransform;
-use egui::{Pos2, Vec2, ViewportBuilder};
+use egui::{Vec2, ViewportBuilder};
 
 use app::App;
 use cosmos_object::CosmosObject;
@@ -17,8 +17,7 @@ mod utils;
 pub fn main() -> eframe::Result {
     let center = CosmosObject {
         mass: 100.0,
-        position: Pos2::default(),
-        velocity: Vec2::ZERO,
+        ..Default::default()
     };
 
     let planet = CosmosObject {

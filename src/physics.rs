@@ -3,6 +3,8 @@ mod gravity;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
+use egui::Vec2;
+
 use crate::cosmos_object::CosmosObject;
 
 pub struct Physics {
@@ -32,22 +34,27 @@ impl Physics {
         let objects = self.objects.read().unwrap();
 
         for i in 0..objects.len() {
-            let (_, [current, right @ ..]) = objects.split_at(i) else {
-                continue;
-            };
-
-            for other in right {
-                let mut current = current.write().unwrap();
-                let mut other = other.write().unwrap();
-
-                gravity::gravity(&mut current, &mut other, self.delta_time);
-            }
-
+            let current = &self.objects.read().unwrap()[i];
             let mut current = current.write().unwrap();
 
-            let delta = current.velocity * self.delta_time;
+            current.acceleration = Vec2::ZERO;
 
-            current.position += delta;
+            for j in 0..objects.len() {
+                if i == j {
+                    continue;
+                }
+
+                let other = &self.objects.read().unwrap()[j];
+                let other = other.read().unwrap();
+
+                gravity::gravity(&mut current, &other);
+            }
+
+            let delta_velocity = current.acceleration * self.delta_time;
+            current.velocity += delta_velocity;
+
+            let delta_position = current.velocity * self.delta_time;
+            current.position += delta_position;
         }
     }
 }
