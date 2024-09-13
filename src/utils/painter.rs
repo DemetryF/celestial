@@ -4,7 +4,7 @@ use egui::{Color32, Pos2, Shape, Stroke, Vec2};
 
 #[derive(Clone, Copy)]
 pub struct Painter<'frame> {
-    pub painter: &'frame egui::Painter,
+    pub raw: &'frame egui::Painter,
     pub transform: TSTransform,
 }
 
@@ -14,7 +14,7 @@ impl<'frame> Painter<'frame> {
 
         shape.transform(self.transform);
 
-        self.painter.add(shape);
+        self.raw.add(shape);
     }
 
     pub fn circle(

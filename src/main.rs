@@ -43,7 +43,28 @@ pub fn main() -> eframe::Result {
             })),
             ..Default::default()
         },
-        Box::new(move |_| {
+        Box::new(move |ctx| {
+            let mut fonts = egui::FontDefinitions::default();
+
+            fonts.font_data.insert(
+                "segoe".to_owned(),
+                egui::FontData::from_static(include_bytes!("../assets/Segoe UI.ttf")),
+            );
+
+            fonts
+                .families
+                .entry(egui::FontFamily::Proportional)
+                .or_default()
+                .insert(0, "segoe".to_owned());
+
+            fonts
+                .families
+                .entry(egui::FontFamily::Monospace)
+                .or_default()
+                .push("segoe".to_owned());
+
+            ctx.egui_ctx.set_fonts(fonts);
+
             let transform = TSTransform::new(size / 2.0, 5.0);
 
             Ok(Box::new(App::new(objects, transform)))

@@ -1,10 +1,15 @@
 use std::sync::{Arc, RwLock};
 
 use egui::emath::TSTransform;
-use egui::{Color32, Frame, Key, Margin, Pos2, Sense, Stroke, Vec2};
+use egui::{Align2, FontId, Frame, Key, Margin, Rounding, Sense, Stroke};
+use egui::{Color32, Pos2, Rect, Vec2};
 
 use crate::cosmos_object::CosmosObject;
 use crate::utils::Painter;
+
+const BACKGROUND_COLOR: Color32 = Color32::from_gray(27);
+const GRID_COLOR: Color32 = Color32::from_gray(60);
+const KM_PER_VPIXEL: f32 = 5e4;
 
 pub struct App {
     pub objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>,
@@ -31,7 +36,7 @@ impl eframe::App for App {
             .frame(Frame {
                 inner_margin: Margin::ZERO,
                 outer_margin: Margin::ZERO,
-                fill: Color32::from_gray(27),
+                fill: BACKGROUND_COLOR,
                 ..Default::default()
             })
             .show(ctx, |ui| {
@@ -40,7 +45,7 @@ impl eframe::App for App {
                     ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
 
                 let painter = Painter {
-                    painter,
+                    raw: painter,
                     transform: self.transform,
                 };
 
@@ -61,6 +66,8 @@ impl eframe::App for App {
                         );
                     }
                 }
+
+                self.draw_scale_info(painter, ui.min_size());
 
                 let Some(mouse_pos) = ctx.input(|state| state.pointer.hover_pos()) else {
                     return;
@@ -246,7 +253,7 @@ impl App {
         let start = (start / self.cell_size).floor();
         let end = (end / self.cell_size).ceil();
 
-        let stroke = Stroke::new(self.cell_size / 20.0, Color32::from_gray(60));
+        let stroke = Stroke::new(self.cell_size / 20.0, GRID_COLOR);
 
         for x in start.x as isize..end.x as isize {
             let points = [
@@ -265,6 +272,67 @@ impl App {
 
             painter.line(points, stroke);
         }
+    }
+
+    fn draw_scale_info(&self, painter: Painter, field_size: Vec2) {
+        let size = Vec2::new(field_size.x, field_size.y * 0.05);
+        let start = field_size.to_pos2() - size;
+
+        painter.raw.rect(
+            Rect::from_min_size(start, size),
+            Rounding::ZERO,
+            BACKGROUND_COLOR,
+            Stroke::new(1.0, GRID_COLOR),
+        );
+
+        let height = size.y / 1.5;
+        let segment_size = size.y / 1.5;
+        let protrusion_size = segment_size / 6.0;
+
+        let stroke = Stroke::new(3.0, GRID_COLOR);
+
+        draw_segment(
+            painter.raw,
+            start + Vec2::splat(size.y / 2.0),
+            segment_size,
+            protrusion_size,
+            stroke,
+        );
+
+        fn draw_segment(
+            painter: &egui::Painter,
+            pos: Pos2,
+            size: f32,
+            protrusion_size: f32,
+            stroke: Stroke,
+        ) {
+            let half_protrusion = protrusion_size / 2.0;
+            let protrusion = Vec2::new(0.0, half_protrusion);
+
+            let points = [pos, pos + Vec2::new(size, 0.0)];
+
+            painter.line_segment(points, stroke);
+            painter.line_segment([points[0] + protrusion, points[0] - protrusion], stroke);
+            painter.line_segment([points[1] + protrusion, points[1] - protrusion], stroke);
+        }
+
+        const KM_PER_PC: f32 = 30.8568e9;
+        const KM_PER_LYR: f32 = 9.4607304725808e12;
+
+        let km_on_side = self.cell_size * KM_PER_VPIXEL;
+        let pc_on_side = km_on_side / KM_PER_PC;
+        let lyr_per_side = km_on_side / KM_PER_LYR;
+
+        let text = format!("{lyr_per_side:e}lyr = {pc_on_side:e}pc = {km_on_side:e}km");
+        let font_size = height * 0.7;
+
+        painter.raw.text(
+            start + Vec2::new(size.y + segment_size, size.y * 0.5 - font_size / 2.0),
+            Align2::LEFT_TOP,
+            text,
+            FontId::new(font_size, egui::FontFamily::Monospace),
+            Color32::from_gray(150),
+        );
     }
 }
 
