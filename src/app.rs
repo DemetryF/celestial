@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use egui::emath::TSTransform;
-use egui::{Color32, Frame, Key, Margin, Pos2, Sense, Vec2};
+use egui::{Color32, Frame, Key, Margin, Pos2, Sense, Stroke, Vec2};
 
 use crate::cosmos_object::CosmosObject;
 use crate::utils::Painter;
@@ -15,6 +15,7 @@ pub struct App {
     adding_mass: f32,
     showed_quantity: Option<PhysicalQuantity>,
     quantity_scale: [f32; 4],
+    cell_size: f32,
 }
 
 impl eframe::App for App {
@@ -24,34 +25,7 @@ impl eframe::App for App {
         self.update_moving(ctx);
         self.update_adding(ctx);
         self.update_zoom(ctx);
-
-        self.showed_quantity = ctx.input(|state| {
-            if state.key_pressed(Key::Escape) {
-                return None;
-            }
-
-            let pressed = if state.key_pressed(Key::V) {
-                Some(PhysicalQuantity::Velocity)
-            } else if state.key_pressed(Key::I) {
-                Some(PhysicalQuantity::Impulse)
-            } else if state.key_pressed(Key::A) {
-                Some(PhysicalQuantity::Acceleration)
-            } else if state.key_pressed(Key::F) {
-                Some(PhysicalQuantity::Force)
-            } else {
-                None
-            };
-
-            if let Some(pressed) = pressed {
-                if Some(pressed) == self.showed_quantity {
-                    None
-                } else {
-                    Some(pressed)
-                }
-            } else {
-                self.showed_quantity
-            }
-        });
+        self.update_showed_quantity(ctx);
 
         egui::CentralPanel::default()
             .frame(Frame {
@@ -69,6 +43,8 @@ impl eframe::App for App {
                     painter,
                     transform: self.transform,
                 };
+
+                self.draw_grid(painter, ui.min_size());
 
                 for object in objects.iter() {
                     let object = &object.read().unwrap();
@@ -123,11 +99,13 @@ impl App {
         Self {
             objects,
             transform,
+
             moving: None,
             adding: None,
             adding_mass: 20.0,
             showed_quantity: None,
             quantity_scale: [1.0, 1.0, 1.0, 1.0],
+            cell_size: 20.0,
         }
     }
 
@@ -144,7 +122,9 @@ impl App {
 
                 let zoom_delta = 1.7f32.powf(delta.y);
 
-                if state.modifiers.shift {
+                if state.modifiers.ctrl {
+                    self.cell_size *= zoom_delta;
+                } else if state.modifiers.shift {
                     if let Some(quantity) = self.showed_quantity {
                         self.quantity_scale[quantity as usize] *= zoom_delta;
                     }
@@ -215,10 +195,10 @@ impl App {
         } else if released {
             let adding = self.adding.take().unwrap();
 
-            let mut objects = self.objects.write().unwrap();
-
             let position = self.transform.inverse() * adding.origin;
             let velocity = (adding.origin - mouse_pos) / self.transform.scaling;
+
+            let mut objects = self.objects.write().unwrap();
 
             objects.push(RwLock::new(CosmosObject {
                 mass: self.adding_mass,
@@ -226,6 +206,64 @@ impl App {
                 velocity,
                 ..Default::default()
             }));
+        }
+    }
+
+    fn update_showed_quantity(&mut self, ctx: &egui::Context) {
+        self.showed_quantity = ctx.input(|state| {
+            if state.key_pressed(Key::Escape) {
+                return None;
+            }
+
+            let pressed = if state.key_pressed(Key::V) {
+                Some(PhysicalQuantity::Velocity)
+            } else if state.key_pressed(Key::I) {
+                Some(PhysicalQuantity::Impulse)
+            } else if state.key_pressed(Key::A) {
+                Some(PhysicalQuantity::Acceleration)
+            } else if state.key_pressed(Key::F) {
+                Some(PhysicalQuantity::Force)
+            } else {
+                None
+            };
+
+            if let Some(pressed) = pressed {
+                if Some(pressed) == self.showed_quantity {
+                    None
+                } else {
+                    Some(pressed)
+                }
+            } else {
+                self.showed_quantity
+            }
+        });
+    }
+
+    fn draw_grid(&self, painter: Painter, ui_size: Vec2) {
+        let start = self.transform.inverse() * Pos2::ZERO;
+        let end = self.transform.inverse() * ui_size.to_pos2();
+
+        let start = (start / self.cell_size).floor();
+        let end = (end / self.cell_size).ceil();
+
+        let stroke = Stroke::new(self.cell_size / 20.0, Color32::from_gray(60));
+
+        for x in start.x as isize..end.x as isize {
+            let points = [
+                Pos2::new(x as f32, start.y) * self.cell_size,
+                Pos2::new(x as f32, end.y) * self.cell_size,
+            ];
+
+            painter.line(points, stroke);
+        }
+
+        for y in start.y as isize..end.y as isize {
+            let points = [
+                Pos2::new(start.x, y as f32) * self.cell_size,
+                Pos2::new(end.x, y as f32) * self.cell_size,
+            ];
+
+            painter.line(points, stroke);
         }
     }
 }
@@ -241,7 +279,7 @@ pub struct Adding {
     pub origin: Pos2,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PhysicalQuantity {
     Velocity = 0,
     Impulse = 1,
