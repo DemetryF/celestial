@@ -34,7 +34,7 @@ impl Physics {
         let objects = self.objects.read().unwrap();
 
         for i in 0..objects.len() {
-            let current = &self.objects.read().unwrap()[i];
+            let current = &objects[i];
             let mut current = current.write().unwrap();
 
             current.acceleration = Vec2::ZERO;
@@ -44,7 +44,7 @@ impl Physics {
                     continue;
                 }
 
-                let other = &self.objects.read().unwrap()[j];
+                let other = &objects[j];
                 let other = other.read().unwrap();
 
                 gravity::gravity(&mut current, &other);
