@@ -146,12 +146,20 @@ impl App {
 
     fn zoom_relative_to(&mut self, delta_scale: f32, point: Pos2) {
         if delta_scale != 1.0 {
-            let new_real_mouse_pos = (point - self.transform.translation) / delta_scale;
+            // mouse coords in virtual space
+            let vmouse = self.transform.inverse() * point;
 
-            let delta = new_real_mouse_pos - point + self.transform.translation;
-
-            self.transform.translation += delta;
+            // apply zoom to transform
             self.transform.scaling *= delta_scale;
+
+            // new real coords of point, the mouse pointed to,
+            let new_rmouse = self.transform * vmouse;
+
+            // shift to which transform.translation should be shifted
+            let shift = point - new_rmouse;
+
+            // apply shift
+            self.transform.translation += shift;
         }
     }
 
