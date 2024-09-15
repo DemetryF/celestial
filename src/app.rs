@@ -5,11 +5,11 @@ use egui::{Align2, FontId, Frame, Key, Margin, Rounding, Sense, Stroke};
 use egui::{Color32, Pos2, Rect, Vec2};
 
 use crate::cosmos_object::CosmosObject;
+use crate::physics::KM_PER_VPX;
 use crate::utils::Painter;
 
 const BACKGROUND_COLOR: Color32 = Color32::from_gray(27);
 const GRID_COLOR: Color32 = Color32::from_gray(60);
-const KM_PER_VPIXEL: f32 = 5e4;
 
 pub struct App {
     pub objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>,
@@ -40,7 +40,6 @@ impl eframe::App for App {
                 ..Default::default()
             })
             .show(ctx, |ui| {
-                let objects = self.objects.read().unwrap();
                 let (_, ref painter) =
                     ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
 
@@ -50,6 +49,8 @@ impl eframe::App for App {
                 };
 
                 self.draw_grid(painter, ui.min_size());
+
+                let objects = self.objects.read().unwrap();
 
                 for object in objects.iter() {
                     let object = &object.read().unwrap();
@@ -327,7 +328,7 @@ impl App {
         const KM_PER_PC: f32 = 30.8568e9;
         const KM_PER_LYR: f32 = 9.4607304725808e12;
 
-        let km_on_side = self.cell_size * KM_PER_VPIXEL;
+        let km_on_side = self.cell_size * KM_PER_VPX;
         let pc_on_side = km_on_side / KM_PER_PC;
         let lyr_per_side = km_on_side / KM_PER_LYR;
 
