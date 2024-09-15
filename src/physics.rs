@@ -1,37 +1,35 @@
 mod gravity;
+mod simulation_state;
 
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use atomic_float::AtomicF32;
 use egui::Vec2;
 
 use crate::cosmos_object::CosmosObject;
 
+pub use simulation_state::SimulationState;
+
 pub const KM_PER_VPX: f32 = 1e5;
+pub const GRAVITIONAL_CONST: f32 = 6.674e-20 / KM_PER_VPX / KM_PER_VPX / KM_PER_VPX;
 
 pub struct Physics {
     pub objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>,
-    pub shared_dt: &'static AtomicF32,
-    pub shared_time_speed: &'static AtomicF32,
+
+    pub sim_state: &'static SimulationState,
 
     delta_time: f32,
-    time_speed: f32,
 }
 
 impl Physics {
     pub fn new(
         objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>,
-        shared_dt: &'static AtomicF32,
-        shared_time_speed: &'static AtomicF32,
+        sim_state: &'static SimulationState,
     ) -> Self {
         Self {
             objects,
-            shared_dt,
-            shared_time_speed,
+            sim_state,
             delta_time: 0.0,
-            time_speed: shared_time_speed.load(Ordering::Acquire),
         }
     }
 
@@ -39,22 +37,20 @@ impl Physics {
         loop {
             let iter_start = Instant::now();
 
-            self.shared_dt.store(self.delta_time, Ordering::Release);
-            self.time_speed = self.shared_time_speed.load(Ordering::Relaxed);
+            self.sim_state.set_delta_time(self.delta_time);
+            let time_speed = self.sim_state.time_speed();
+
+            self.sim_state
+                .set_elapsed(self.sim_state.elapsed() + self.delta_time);
 
             self.update();
 
-            self.delta_time = iter_start.elapsed().as_secs_f32() * self.time_speed;
+            self.delta_time = iter_start.elapsed().as_secs_f32() * time_speed;
         }
     }
 
     pub fn update(&self) {
         let objects = self.objects.read().unwrap();
-
-        // km^3 / kg / sec^2
-        let gravitional_const = 6.674e-11 / 1e9;
-        // vpx^3 / kg / sec^2
-        let gravitional_const = gravitional_const / KM_PER_VPX.powi(3);
 
         for i in 0..objects.len() {
             let current = &objects[i];
@@ -73,7 +69,7 @@ impl Physics {
                 gravity::gravity(&mut current, &other);
             }
 
-            current.acceleration *= gravitional_const;
+            current.acceleration *= GRAVITIONAL_CONST;
 
             let delta_velocity = current.acceleration * self.delta_time;
             current.velocity += delta_velocity;
