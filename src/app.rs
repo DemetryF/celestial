@@ -5,14 +5,16 @@ use egui::{Align2, FontId, Frame, Key, Margin, Rounding, Sense, Stroke};
 use egui::{Color32, Pos2, Rect, Vec2};
 
 use crate::cosmos_object::CosmosObject;
-use crate::physics::KM_PER_VPX;
-use crate::utils::Painter;
+use crate::physics::{SimulationState, KM_PER_VPX};
+use crate::utils::{format_time, format_time_ord, Painter};
 
 const BACKGROUND_COLOR: Color32 = Color32::from_gray(27);
 const GRID_COLOR: Color32 = Color32::from_gray(60);
 
 pub struct App {
     pub objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>,
+
+    sim_state: &'static SimulationState,
 
     moving: Option<Moving>,
     adding: Option<Adding>,
@@ -68,7 +70,7 @@ impl eframe::App for App {
                     }
                 }
 
-                self.draw_scale_info(painter, ui.min_size());
+                self.show_info(painter, ui.min_size());
 
                 let Some(mouse_pos) = ctx.input(|state| state.pointer.hover_pos()) else {
                     return;
@@ -103,10 +105,16 @@ impl eframe::App for App {
 }
 
 impl App {
-    pub fn new(objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>, transform: TSTransform) -> Self {
+    pub fn new(
+        objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>,
+        transform: TSTransform,
+        sim_state: &'static SimulationState,
+    ) -> Self {
         Self {
             objects,
             transform,
+
+            sim_state,
 
             moving: None,
             adding: None,
@@ -283,29 +291,15 @@ impl App {
         }
     }
 
-    fn draw_scale_info(&self, painter: Painter, field_size: Vec2) {
-        let size = Vec2::new(field_size.x, field_size.y * 0.05);
-        let start = field_size.to_pos2() - size;
+    fn show_info(&self, painter: Painter, field_size: Vec2) {
+        let box_size = Vec2::new(field_size.x, field_size.y * 0.1);
+        let box_start = field_size.to_pos2() - box_size;
 
         painter.raw.rect(
-            Rect::from_min_size(start, size),
+            Rect::from_min_size(box_start, box_size),
             Rounding::ZERO,
             BACKGROUND_COLOR,
             Stroke::new(1.0, GRID_COLOR),
-        );
-
-        let height = size.y / 1.5;
-        let segment_size = size.y / 1.5;
-        let protrusion_size = segment_size / 6.0;
-
-        let stroke = Stroke::new(3.0, GRID_COLOR);
-
-        draw_segment(
-            painter.raw,
-            start + Vec2::splat(size.y / 2.0),
-            segment_size,
-            protrusion_size,
-            stroke,
         );
 
         fn draw_segment(
@@ -316,7 +310,7 @@ impl App {
             stroke: Stroke,
         ) {
             let half_protrusion = protrusion_size / 2.0;
-            let protrusion = Vec2::new(0.0, half_protrusion);
+            let protrusion = Vec2::new(0., half_protrusion);
 
             let points = [pos, pos + Vec2::new(size, 0.0)];
 
@@ -325,6 +319,20 @@ impl App {
             painter.line_segment([points[1] + protrusion, points[1] - protrusion], stroke);
         }
 
+        let height = box_size.y / 3.;
+        let segment_size = box_size.y / 3.;
+        let protrusion_size = segment_size / 12.;
+
+        let stroke = Stroke::new(3., GRID_COLOR);
+
+        draw_segment(
+            painter.raw,
+            box_start + Vec2::splat(box_size.y / 4.0),
+            segment_size,
+            protrusion_size,
+            stroke,
+        );
+
         const KM_PER_PC: f32 = 30.8568e9;
         const KM_PER_LYR: f32 = 9.4607304725808e12;
 
@@ -332,14 +340,83 @@ impl App {
         let pc_on_side = km_on_side / KM_PER_PC;
         let lyr_per_side = km_on_side / KM_PER_LYR;
 
-        let text = format!("{lyr_per_side:e}lyr = {pc_on_side:e}pc = {km_on_side:e}km");
+        let scale_info_text =
+            format!("{lyr_per_side:.2e}lyr = {pc_on_side:.2e}pc = {km_on_side:.2e}km");
+
         let font_size = height * 0.7;
 
+        let scale_info_text_pos = box_start
+            + Vec2::new(
+                box_size.y / 2. + segment_size,
+                box_size.y * 0.3 - font_size / 2.,
+            );
+
+        let font_id = FontId::new(font_size, egui::FontFamily::Monospace);
+
         painter.raw.text(
-            start + Vec2::new(size.y + segment_size, size.y * 0.5 - font_size / 2.0),
+            scale_info_text_pos,
             Align2::LEFT_TOP,
-            text,
-            FontId::new(font_size, egui::FontFamily::Monospace),
+            scale_info_text,
+            font_id.clone(),
+            Color32::from_gray(150),
+        );
+
+        let elapsed_text = format_time_ord(self.sim_state.elapsed() as usize);
+
+        painter.raw.text(
+            Pos2::new(box_size.x - box_size.y / 4., scale_info_text_pos.y),
+            Align2::RIGHT_TOP,
+            elapsed_text,
+            font_id.clone(),
+            Color32::from_gray(150),
+        );
+
+        if let Some(quantity) = self.showed_quantity {
+            let stroke = Stroke::new(3., quantity.color());
+
+            draw_segment(
+                painter.raw,
+                box_start + Vec2::new(box_size.y / 4., box_size.y * 3. / 4.),
+                segment_size,
+                protrusion_size,
+                stroke,
+            );
+
+            let quantity_in_side = km_on_side / self.quantity_scale[quantity as usize];
+
+            let quantity_info_text = format!("{quantity_in_side:.2e}{}", quantity.unit_name());
+
+            let quantity_info_pos = box_start
+                + Vec2::new(
+                    box_size.y / 2. + segment_size,
+                    box_size.y * 0.7 - font_size / 2.,
+                );
+
+            painter.raw.text(
+                quantity_info_pos,
+                Align2::LEFT_TOP,
+                quantity_info_text,
+                font_id.clone(),
+                Color32::from_gray(150),
+            );
+        }
+
+        let time_speed_info_text = format!(
+            "{} in 1 sec",
+            format_time(self.sim_state.time_speed() as usize)
+        );
+
+        let time_speed_info_pos = box_start
+            + Vec2::new(
+                box_size.x - box_size.y / 4.,
+                box_size.y * 0.7 - font_size / 2.,
+            );
+
+        painter.raw.text(
+            time_speed_info_pos,
+            Align2::RIGHT_TOP,
+            time_speed_info_text,
+            font_id.clone(),
             Color32::from_gray(150),
         );
     }
@@ -371,6 +448,15 @@ impl PhysicalQuantity {
             PhysicalQuantity::Impulse => Color32::LIGHT_BLUE,
             PhysicalQuantity::Acceleration => Color32::LIGHT_GREEN,
             PhysicalQuantity::Force => Color32::LIGHT_YELLOW,
+        }
+    }
+
+    pub fn unit_name(self) -> &'static str {
+        match self {
+            PhysicalQuantity::Velocity => "km/sec",
+            PhysicalQuantity::Impulse => "kg*km/sec",
+            PhysicalQuantity::Acceleration => "km/sec^2",
+            PhysicalQuantity::Force => "kg*km/sec^2",
         }
     }
 }

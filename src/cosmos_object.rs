@@ -1,6 +1,7 @@
 use egui::{Color32, Pos2, Stroke, Vec2};
 
 use crate::app::PhysicalQuantity;
+use crate::physics::GRAVITIONAL_CONST;
 use crate::utils::Painter;
 
 #[derive(Default)]
@@ -26,15 +27,8 @@ impl CosmosObject {
         painter.circle(self.position, self.radius, Color32::GRAY, Stroke::NONE);
     }
 
-    pub fn orbit(
-        mut self,
-        other: &Self,
-        orbit_radius: f32,
-        anomaly: f32,
-        dir: f32,
-        gravitional_const: f32,
-    ) -> Self {
-        let speed = (gravitional_const * other.mass / orbit_radius).sqrt();
+    pub fn orbit(mut self, other: &Self, orbit_radius: f32, anomaly: f32, dir: f32) -> Self {
+        let speed = (GRAVITIONAL_CONST * other.mass / orbit_radius).sqrt();
 
         let u = Vec2::angled(anomaly);
 
