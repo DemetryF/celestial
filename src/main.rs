@@ -1,13 +1,14 @@
 use std::sync::{Arc, RwLock};
 use std::thread;
 
+use atomic_float::AtomicF32;
 use eframe::NativeOptions;
 use egui::emath::TSTransform;
 use egui::{Vec2, ViewportBuilder};
 
 use app::App;
 use cosmos_object::CosmosObject;
-use physics::Physics;
+use physics::{Physics, KM_PER_VPX};
 
 mod app;
 mod cosmos_object;
@@ -15,21 +16,39 @@ mod physics;
 mod utils;
 
 pub fn main() -> eframe::Result {
-    let center = CosmosObject {
-        mass: 100.0,
+    static DELTA_TIME: AtomicF32 = AtomicF32::new(0.0);
+
+    // virtual day in real second
+    static TIME_SPEED: AtomicF32 = AtomicF32::new(60.0 * 60.0 * 24.0);
+
+    // km^3 / kg / sec^2
+    let gravitional_const = 6.674e-11 / 1e9;
+    // vpx^3 / kg / sec^2
+    let gravitional_const = gravitional_const / KM_PER_VPX.powi(3);
+
+    let sun = CosmosObject {
+        mass: 2e30,
+        radius: 7e5 / KM_PER_VPX,
         ..Default::default()
     };
 
-    let planet = CosmosObject {
-        mass: 5.0,
+    let earth = CosmosObject {
+        mass: 6e24,
+        radius: 6.5e3 / KM_PER_VPX,
         ..Default::default()
     }
-    .orbit(&center, 30.0, 0.0, 1.0);
+    .orbit(
+        &sun,
+        149_597_871.0 / KM_PER_VPX,
+        0.0,
+        1.0,
+        gravitional_const,
+    );
 
-    let objects = vec![RwLock::new(center), RwLock::new(planet)];
+    let objects = vec![RwLock::new(sun), RwLock::new(earth)];
     let objects = Arc::new(RwLock::new(objects));
 
-    let mut physics = Physics::new(Arc::clone(&objects));
+    let mut physics = Physics::new(Arc::clone(&objects), &DELTA_TIME, &TIME_SPEED);
 
     thread::spawn(move || physics.start());
 
@@ -65,7 +84,7 @@ pub fn main() -> eframe::Result {
 
             ctx.egui_ctx.set_fonts(fonts);
 
-            let transform = TSTransform::new(size / 2.0, 5.0);
+            let transform = TSTransform::new(size / 2.0, 1.0);
 
             Ok(Box::new(App::new(objects, transform)))
         }),

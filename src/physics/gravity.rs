@@ -7,7 +7,5 @@ pub fn gravity(a: &mut CosmosObject, b: &CosmosObject) {
 
     let dir = rect.normalized();
 
-    let force = a.mass * b.mass / dist.powi(2);
-
-    a.acceleration += dir * force / a.mass;
+    a.acceleration += dir * b.mass / dist.powi(2);
 }
