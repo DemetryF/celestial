@@ -138,7 +138,9 @@ impl App {
 
                 let zoom_delta = 1.7f32.powf(delta.y);
 
-                if state.modifiers.ctrl {
+                if state.modifiers.alt {
+                    self.sim_state.zoom_time_speed(zoom_delta);
+                } else if state.modifiers.ctrl {
                     self.cell_size *= zoom_delta;
                 } else if state.modifiers.shift {
                     if let Some(quantity) = self.showed_quantity {
