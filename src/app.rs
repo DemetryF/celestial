@@ -445,9 +445,9 @@ impl PhysicalQuantity {
     pub fn color(self) -> Color32 {
         match self {
             PhysicalQuantity::Velocity => Color32::LIGHT_RED,
-            PhysicalQuantity::Impulse => Color32::LIGHT_BLUE,
+            PhysicalQuantity::Impulse => Color32::from_rgb(156, 245, 255),
             PhysicalQuantity::Acceleration => Color32::LIGHT_GREEN,
-            PhysicalQuantity::Force => Color32::LIGHT_YELLOW,
+            PhysicalQuantity::Force => Color32::from_rgb(250, 255, 105),
         }
     }
 
