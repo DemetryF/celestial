@@ -1,4 +1,4 @@
-use std::sync;
+use std::sync::atomic::Ordering;
 
 use atomic_float::AtomicF32;
 
@@ -18,28 +18,30 @@ impl SimulationState {
     }
 
     pub fn delta_time(&self) -> f32 {
-        self.delta_time.load(sync::atomic::Ordering::SeqCst)
+        self.delta_time.load(Ordering::Relaxed)
     }
 
     pub fn set_delta_time(&self, delta_time: f32) {
-        self.delta_time
-            .store(delta_time, sync::atomic::Ordering::Relaxed)
+        self.delta_time.store(delta_time, Ordering::Relaxed)
     }
 
     pub fn time_speed(&self) -> f32 {
-        self.time_speed.load(sync::atomic::Ordering::SeqCst)
+        self.time_speed.load(Ordering::Relaxed)
     }
 
-    pub fn set_time_speed(&self, time_speed: f32) {
+    pub fn zoom_time_speed(&self, zoom_delta: f32) {
         self.time_speed
-            .store(time_speed, sync::atomic::Ordering::Relaxed)
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |time_speed| {
+                Some(time_speed * zoom_delta)
+            })
+            .unwrap();
     }
 
     pub fn elapsed(&self) -> f32 {
-        self.elapsed.load(sync::atomic::Ordering::SeqCst)
+        self.elapsed.load(Ordering::Relaxed)
     }
 
-    pub fn set_elapsed(&self, elapsed: f32) {
-        self.elapsed.store(elapsed, sync::atomic::Ordering::Relaxed)
+    pub fn update_elapsed(&self, delta_time: f32) {
+        self.elapsed.fetch_add(delta_time, Ordering::Relaxed);
     }
 }

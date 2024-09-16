@@ -38,10 +38,9 @@ impl Physics {
             let iter_start = Instant::now();
 
             self.sim_state.set_delta_time(self.delta_time);
-            let time_speed = self.sim_state.time_speed();
+            self.sim_state.update_elapsed(self.delta_time);
 
-            self.sim_state
-                .set_elapsed(self.sim_state.elapsed() + self.delta_time);
+            let time_speed = self.sim_state.time_speed();
 
             self.update();
 
