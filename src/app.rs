@@ -51,49 +51,33 @@ impl eframe::App for App {
                 };
 
                 self.draw_grid(painter, ui.min_size());
-
-                let objects = self.objects.read().unwrap();
-
-                for object in objects.iter() {
-                    let object = &object.read().unwrap();
-
-                    object.draw(painter);
-
-                    if let Some(quantity) = self.showed_quantity {
-                        let scale = self.quantity_scale[quantity as usize];
-
-                        painter.vec(
-                            object.position,
-                            object.get_quantity(quantity) * scale,
-                            quantity.color(),
-                        );
-                    }
-                }
-
+                self.draw_planets(painter);
                 self.show_info(painter, ui.min_size());
 
                 let Some(mouse_pos) = ctx.input(|state| state.pointer.hover_pos()) else {
                     return;
                 };
 
-                if let Some(Adding { origin }) = self.adding {
+                if let Some(Adding { position: origin }) = self.adding {
                     let position = self.transform.inverse() * origin;
-                    let velocity = (origin - mouse_pos) / self.transform.scaling;
+                    let velocity = (origin - mouse_pos)
+                        / self.transform.scaling
+                        / self.quantity_scale[PhysicalQuantity::Velocity as usize];
 
-                    CosmosObject {
+                    let new_object = CosmosObject {
                         mass: self.adding_mass,
+                        radius: self.adding_mass.sqrt(),
                         position,
                         velocity,
                         ..Default::default()
-                    }
-                    .draw(painter);
+                    };
 
-                    let scale = self.quantity_scale[PhysicalQuantity::Velocity as usize];
+                    new_object.draw(painter);
 
-                    painter.vec(position, velocity * scale, Color32::LIGHT_RED);
+                    self.draw_quantity_vec(painter, PhysicalQuantity::Velocity, &new_object);
 
                     ctx.input(|state| {
-                        for event in state.events.iter() {
+                        for event in &state.events {
                             if let egui::Event::MouseWheel { delta, .. } = event {
                                 self.adding_mass *= 1.7f32.powf(delta.y);
                             }
@@ -217,17 +201,22 @@ impl App {
         };
 
         if pressed {
-            self.adding = Some(Adding { origin: mouse_pos })
+            self.adding = Some(Adding {
+                position: mouse_pos,
+            })
         } else if released {
             let adding = self.adding.take().unwrap();
 
-            let position = self.transform.inverse() * adding.origin;
-            let velocity = (adding.origin - mouse_pos) / self.transform.scaling;
+            let position = self.transform.inverse() * adding.position;
+            let velocity = (adding.position - mouse_pos)
+                / self.transform.scaling
+                / self.quantity_scale[PhysicalQuantity::Velocity as usize];
 
             let mut objects = self.objects.write().unwrap();
 
             objects.push(RwLock::new(CosmosObject {
                 mass: self.adding_mass,
+                radius: self.adding_mass.sqrt(),
                 position,
                 velocity,
                 ..Default::default()
@@ -422,6 +411,34 @@ impl App {
             Color32::from_gray(150),
         );
     }
+
+    fn draw_quantity_vec(
+        &self,
+        painter: Painter,
+        quantity: PhysicalQuantity,
+        object: &CosmosObject,
+    ) {
+        let scale = self.quantity_scale[quantity as usize];
+        let vec = object.get_quantity(quantity) * scale;
+
+        let stroke = Stroke::new(object.radius * 0.1, quantity.color());
+
+        painter.vec(object.position, vec, stroke)
+    }
+
+    fn draw_planets(&mut self, painter: Painter<'_>) {
+        let objects = self.objects.read().unwrap();
+
+        for object in objects.iter() {
+            let object = &object.read().unwrap();
+
+            object.draw(painter);
+
+            if let Some(quantity) = self.showed_quantity {
+                self.draw_quantity_vec(painter, quantity, object)
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -432,7 +449,7 @@ pub struct Moving {
 
 #[derive(Clone, Copy)]
 pub struct Adding {
-    pub origin: Pos2,
+    pub position: Pos2,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
