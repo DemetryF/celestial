@@ -20,13 +20,13 @@ pub fn main() -> eframe::Result {
 
     let sun = CosmosObject {
         mass: 2e30,
-        radius: 7e5 / KM_PER_VPX,
+        radius: 7e5 * 100. / KM_PER_VPX,
         ..Default::default()
     };
 
     let earth = CosmosObject {
         mass: 6e24,
-        radius: 6.5e3 / KM_PER_VPX,
+        radius: 6.5e3 * 100. / KM_PER_VPX,
         ..Default::default()
     }
     .orbit(&sun, 149_597_871.0 / KM_PER_VPX, 0.0, 1.0);

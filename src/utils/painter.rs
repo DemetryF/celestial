@@ -39,12 +39,10 @@ impl<'frame> Painter<'frame> {
         })
     }
 
-    pub fn vec(&self, origin: Pos2, vec: Vec2, color: Color32) {
-        let stroke = Stroke::new(0.5, color);
-
+    pub fn vec(&self, origin: Pos2, vec: Vec2, stroke: Stroke) {
         let rot = Rot2::from_angle(std::f32::consts::TAU / 10.);
 
-        let tip_length = 0.3;
+        let tip_length = stroke.width * 0.6;
         let tip = origin + vec;
         let dir = vec.normalized();
 
