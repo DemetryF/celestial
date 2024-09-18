@@ -9,7 +9,7 @@ use crate::physics::{SimulationState, KM_PER_VPX};
 use crate::utils::{format_time, format_time_ord, Painter};
 
 const BACKGROUND_COLOR: Color32 = Color32::from_gray(27);
-const GRID_COLOR: Color32 = Color32::from_gray(60);
+const GRID_COLOR: Color32 = Color32::from_gray(40);
 
 pub struct App {
     pub objects: Arc<RwLock<Vec<RwLock<CosmosObject>>>>,
@@ -33,6 +33,8 @@ impl eframe::App for App {
         self.update_adding(ctx);
         self.update_zoom(ctx);
         self.update_showed_quantity(ctx);
+
+        self.autoscale_grid();
 
         egui::CentralPanel::default()
             .frame(Frame {
@@ -120,12 +122,10 @@ impl App {
                     continue;
                 };
 
-                let zoom_delta = 1.7f32.powf(delta.y);
+                let zoom_delta = 1.5f32.powf(delta.y);
 
                 if state.modifiers.alt {
                     self.sim_state.zoom_time_speed(zoom_delta);
-                } else if state.modifiers.ctrl {
-                    self.cell_size *= zoom_delta;
                 } else if state.modifiers.shift {
                     if let Some(quantity) = self.showed_quantity {
                         self.quantity_scale[quantity as usize] *= zoom_delta;
@@ -311,8 +311,8 @@ impl App {
         }
 
         let height = box_size.y / 3.;
-        let segment_size = box_size.y / 3.;
-        let protrusion_size = segment_size / 12.;
+        let segment_size = self.cell_size * self.transform.scaling;
+        let protrusion_size = box_size.y / 20.;
 
         let stroke = Stroke::new(3., GRID_COLOR);
 
@@ -437,6 +437,19 @@ impl App {
             if let Some(quantity) = self.showed_quantity {
                 self.draw_quantity_vec(painter, quantity, object)
             }
+        }
+    }
+
+    fn autoscale_grid(&mut self) {
+        const MAX_SIZE: f32 = 100.0;
+        const MIN_SIZE: f32 = 20.0;
+
+        if self.cell_size * self.transform.scaling > MAX_SIZE {
+            self.cell_size /= 2.0;
+        }
+
+        if self.cell_size * self.transform.scaling < MIN_SIZE {
+            self.cell_size *= 2.0;
         }
     }
 }
